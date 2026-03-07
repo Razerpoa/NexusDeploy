@@ -1,5 +1,0 @@
-typer
-jinja2
-pydantic
-docker
-pyyaml

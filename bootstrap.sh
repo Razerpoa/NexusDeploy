@@ -33,7 +33,8 @@ if [ -f /etc/os-release ]; then
     elif [ "$ID" = "arch" ]; then
         echo "📦 Installing prerequisites for Arch Linux..."
         sudo pacman -Sy --noconfirm docker docker-compose python-pip git
-        sudo systemctl enable --now docker
+        sudo systemctl enable --now docker.socket
+        sudo systemctl enable --now docker.service
         sudo usermod -aG docker $USER
         echo "⚠️ Note: You may need to log out and back in for group changes to take effect."
     else

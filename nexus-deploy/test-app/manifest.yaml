@@ -1,0 +1,19 @@
+project_name: "root-test-app"
+image: "nginx:alpine"
+
+routing:
+  address: "0.0.0.0"       
+  port: 8081               
+  path: "/test"           
+  ssl: false               
+
+infrastructure:
+  networks:
+    - name: "nexus-apps"
+      driver: "bridge"
+  volumes:
+    - name: "test-data"
+      mount_path: "/usr/share/nginx/html"
+
+env_vars:
+  DEBUG: "true"

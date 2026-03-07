@@ -8,6 +8,7 @@ from typing import Dict, Any
 
 from .schema import Manifest
 from .docker_mgr import pre_flight_checks, get_container_ip_and_port, reload_nginx, get_client
+from .logger import logger, LOG_FILE
 
 # Define base paths
 BASE_DIR = Path(__file__).resolve().parent.parent

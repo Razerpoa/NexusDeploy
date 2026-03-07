@@ -31,7 +31,7 @@ ENV/
 docker-compose.override.yml
 
 # Application Specific
-sample-app/docker-compose.yaml
+apps/
 
 # OS
 .DS_Store

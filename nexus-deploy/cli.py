@@ -13,12 +13,15 @@ from core.logger import logger, LOG_FILE
 app = typer.Typer(help="NexusDeploy - Zero-touch Docker orchestration system")
 
 @app.command()
-def deploy(folder: str):
+def deploy(
+    folder: str,
+    dry_run: bool = typer.Option(False, "--dry-run", help="Simulate deployment without modifying resources")
+):
     """
     Deploy an application from a specified folder containing manifest.yaml
     """
     try:
-        deploy_app(folder)
+        deploy_app(folder, dry_run=dry_run)
     except Exception as e:
         logger.exception("Deployment failed")
         typer.echo(f"Deployment failed. See {LOG_FILE} for details.", err=True)

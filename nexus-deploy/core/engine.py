@@ -41,9 +41,9 @@ def load_manifest(app_dir: Path) -> Manifest:
         print(e)
         raise
 
-def deploy_app(app_dir: str):
+def deploy_app(app_dir: str, dry_run: bool = False):
     app_path = Path(app_dir).resolve()
-    print(f"Deploying from {app_path}...")
+    print(f"{'[DRY RUN] ' if dry_run else ''}Deploying from {app_path}...")
     
     # 1. Validation
     manifest = load_manifest(app_path)
@@ -52,45 +52,59 @@ def deploy_app(app_dir: str):
     # 2. Port Allocation
     if manifest.routing.port is None:
         print("No port specified. Finding available port...")
-        manifest.routing.port = find_available_port(manifest.routing.address)
+        if not dry_run:
+            manifest.routing.port = find_available_port(manifest.routing.address)
+        else:
+            manifest.routing.port = 9000  # Mock port for dry run
         print(f"Assigned dynamic port: {manifest.routing.port}")
-    elif not is_port_available(manifest.routing.address, manifest.routing.port):
+    elif not dry_run and not is_port_available(manifest.routing.address, manifest.routing.port):
         raise RuntimeError(f"Port {manifest.routing.port} is already in use on {manifest.routing.address}")
 
     # 3. Infrastructure
-    pre_flight_checks(manifest.infrastructure.networks, manifest.infrastructure.volumes)
+    if not dry_run:
+        pre_flight_checks(manifest.infrastructure.networks, manifest.infrastructure.volumes)
+    else:
+        print(f"[DRY RUN] Would check/create {len(manifest.infrastructure.networks)} networks and {len(manifest.infrastructure.volumes)} volumes.")
 
     # 4. Generate docker-compose.yaml
     compose_tpl = env.get_template("app-compose.j2")
     compose_out = compose_tpl.render(manifest=manifest)
     
     compose_file = app_path / "docker-compose.yaml"
-    with open(compose_file, "w") as f:
-        f.write(compose_out)
-    print(f"Generated {compose_file}")
+    if not dry_run:
+        with open(compose_file, "w") as f:
+            f.write(compose_out)
+        print(f"Generated {compose_file}")
+    else:
+        print(f"\n[DRY RUN] Rendered docker-compose.yaml:\n{'-'*40}\n{compose_out}\n{'-'*40}")
 
     # 5. Start Container via Docker Compose
-    print(f"Starting docker-compose for {manifest.project_name}...")
-    subprocess.run(
-        ["docker", "compose", "-p", manifest.project_name, "up", "-d"],
-        cwd=app_path,
-        check=True
-    )
-    
-    # Wait for container to be ready
-    try:
-        wait_for_container_health(manifest.project_name)
-    except Exception as e:
-        # If container fails to start, we should probably stop the compose to not leave it half-baked
-        print(f"Container failed health check: {e}. Tearing down...")
-        subprocess.run(["docker", "compose", "-p", manifest.project_name, "down"], cwd=app_path)
-        raise
+    print(f"{'[DRY RUN] Would start' if dry_run else 'Starting'} docker-compose for {manifest.project_name}...")
+    if not dry_run:
+        subprocess.run(
+            ["docker", "compose", "-p", manifest.project_name, "up", "-d"],
+            cwd=app_path,
+            check=True
+        )
+        
+        # Wait for container to be ready
+        try:
+            wait_for_container_health(manifest.project_name)
+        except Exception as e:
+            # If container fails to start, we should probably stop the compose to not leave it half-baked
+            print(f"Container failed health check: {e}. Tearing down...")
+            subprocess.run(["docker", "compose", "-p", manifest.project_name, "down"], cwd=app_path)
+            raise
 
     # 6. Generate Nginx Route
-    ip, port = get_container_ip_and_port(manifest.project_name)
-    if not ip:
-        print(f"Warning: Could not determine internal IP for container {manifest.project_name}.")
-        ip = "127.0.0.1"
+    if not dry_run:
+        ip, port = get_container_ip_and_port(manifest.project_name)
+        if not ip:
+            print(f"Warning: Could not determine internal IP for container {manifest.project_name}.")
+            ip = "127.0.0.1"
+            port = 80
+    else:
+        ip = "172.18.0.2" # Mock IP for dry run
         port = 80
 
     custom_conf_path = app_path / "custom.conf"
@@ -109,6 +123,11 @@ def deploy_app(app_dir: str):
 
     conf_file = GATEWAY_CONF_D / f"{manifest.project_name}.conf"
     
+    if dry_run:
+        print(f"\n[DRY RUN] Rendered Nginx vhost config:\n{'-'*40}\n{vhost_out}\n{'-'*40}")
+        print(f"🎉 [DRY RUN] Simulated deployment of {manifest.project_name} at http://{manifest.routing.address}:{manifest.routing.port}{manifest.routing.path}")
+        return
+
     # Keep track if we overwrite an existing config so we can roll back
     old_conf_data = None
     if conf_file.exists():

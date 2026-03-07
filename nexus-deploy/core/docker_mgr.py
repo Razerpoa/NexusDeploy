@@ -115,20 +115,27 @@ def get_gateway_container():
     except NotFound:
         return None
 
-def reload_nginx():
+def reload_nginx() -> Tuple[bool, str]:
     gateway = get_gateway_container()
     if not gateway:
-        print("Gateway container 'nexus-gateway' not found. Cannot reload Nginx.")
-        return False
+        msg = "Gateway container 'nexus-gateway' not found. Cannot reload Nginx."
+        logger.error(msg)
+        return False, msg
     
-    print("Reloading Nginx in gateway container...")
-    exit_code, output = gateway.exec_run("nginx -s reload")
-    if exit_code == 0:
-        print("Nginx reloaded successfully.")
-        return True
+    # Test configuration first
+    test_exit_code, test_output = gateway.exec_run("nginx -t")
+    if test_exit_code != 0:
+        logger.error(f"Nginx configuration test failed:\n{test_output.decode('utf-8')}")
+        return False, test_output.decode('utf-8')
+        
+    # Reload configuration
+    reload_exit_code, reload_output = gateway.exec_run("nginx -s reload")
+    if reload_exit_code == 0:
+        return True, "Success"
     else:
-        print(f"Failed to reload Nginx: {output.decode('utf-8')}")
-        return False
+        logger.error(f"Nginx reload failed:\n{reload_output.decode('utf-8')}")
+        return False, reload_output.decode('utf-8')
+
 
 def get_container_ip_and_port(project_name: str):
     client = get_client()

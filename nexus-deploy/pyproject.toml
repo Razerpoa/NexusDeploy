@@ -1,0 +1,23 @@
+[project]
+name = "nexus-deploy"
+version = "0.1.0"
+description = "A zero-touch Docker orchestration system"
+requires-python = ">=3.12"
+dependencies = [
+    "typer",
+    "jinja2",
+    "pydantic",
+    "docker",
+    "pyyaml"
+]
+
+[project.scripts]
+nexus = "cli:app"
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+py-modules = ["cli"]
+packages = ["core"]

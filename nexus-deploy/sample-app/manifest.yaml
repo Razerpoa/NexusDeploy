@@ -1,0 +1,19 @@
+project_name: "hello-world"
+image: "nginx:alpine"
+
+routing:
+  address: "0.0.0.0"       # Bind IP
+  port: 8080               # Host port
+  path: "/hello"           # URL subpath
+  ssl: false               # Flag for Certbot
+
+infrastructure:
+  networks:
+    - name: "nexus-apps"
+      driver: "bridge"
+  volumes:
+    - name: "hello-data"
+      mount_path: "/usr/share/nginx/html"
+
+env_vars:
+  DEBUG: "true"

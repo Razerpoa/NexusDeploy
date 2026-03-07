@@ -1,0 +1,24 @@
+server {
+    listen {{ manifest.routing.address }}:{{ manifest.routing.port }};
+    server_name _;
+
+    location {{ manifest.routing.path }} {
+        {% if manifest.routing.path != "/" %}
+        rewrite ^{{ manifest.routing.path }}/(.*) /$1 break;
+        rewrite ^{{ manifest.routing.path }}$ / break;
+        {% endif %}
+        
+        # Proxy to the container IP
+        proxy_pass http://{{ container_ip }}{% if container_port %}:{{ container_port }}{% endif %};
+        
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    {% if custom_conf %}
+    # --- Custom Configuration Injected ---
+    {{ custom_conf }}
+    {% endif %}
+}

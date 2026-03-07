@@ -1,0 +1,45 @@
+services:
+  {{ manifest.project_name }}:
+    image: {{ manifest.image }}
+    container_name: {{ manifest.project_name }}
+    restart: unless-stopped
+    
+    {% if manifest.env_vars %}
+    environment:
+      {% for key, value in manifest.env_vars.items() %}
+      - {{ key }}={{ value }}
+      {% endfor %}
+    {% endif %}
+
+    {% if manifest.infrastructure.volumes %}
+    volumes:
+      {% for vol in manifest.infrastructure.volumes %}
+      - {{ vol.name }}:{{ vol.mount_path }}
+      {% endfor %}
+    {% endif %}
+
+    networks:
+      - default
+      {% if manifest.infrastructure.networks %}
+      {% for net in manifest.infrastructure.networks %}
+      - {{ net.name }}
+      {% endfor %}
+      {% endif %}
+
+{% if manifest.infrastructure.networks or manifest.infrastructure.volumes %}
+{% if manifest.infrastructure.volumes %}
+volumes:
+  {% for vol in manifest.infrastructure.volumes %}
+  {{ vol.name }}:
+    external: true
+  {% endfor %}
+{% endif %}
+
+{% if manifest.infrastructure.networks %}
+networks:
+  {% for net in manifest.infrastructure.networks %}
+  {{ net.name }}:
+    external: true
+  {% endfor %}
+{% endif %}
+{% endif %}

@@ -62,6 +62,11 @@ pip install -e .
 # 3. Start Gateway Nginx
 echo "🌐 Starting global Gateway Nginx..."
 cd gateway
+
+# Ensure conf.d exists and is owned by the user (prevent docker from creating it as root)
+mkdir -p conf.d
+sudo chown -R $USER:$USER conf.d
+
 sudo docker compose -p nexus-gateway up -d
 echo "✅ NexusDeploy Gateway is running."
 

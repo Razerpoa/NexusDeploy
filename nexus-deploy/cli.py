@@ -69,6 +69,25 @@ def prune():
         raise typer.Exit(code=1)
 
 @app.command()
+def reload():
+    """
+    Manually trigger an Nginx configuration test and reload on the Gateway
+    """
+    from core.docker_mgr import reload_nginx
+    try:
+        typer.echo("Initiating Nginx Gateway reload sequence...")
+        success, message = reload_nginx()
+        if success:
+            typer.echo("✅ Nginx reloaded successfully.")
+        else:
+            typer.echo(f"🚨 Nginx reload failed: {message}", err=True)
+            raise typer.Exit(code=1)
+    except Exception as e:
+        logger.exception("Reload command failed")
+        typer.echo(f"Reload command failed. See {LOG_FILE} for details.", err=True)
+        raise typer.Exit(code=1)
+
+@app.command()
 def list():
     """
     List all active Nexus-managed containers

@@ -3,8 +3,9 @@ from pydantic import BaseModel, Field
 
 class RoutingConfig(BaseModel):
     address: str = "0.0.0.0"
-    port: int
+    port: Optional[int] = None
     path: str = "/"
+    domain: str = "_"
     ssl: bool = False
 
 class NetworkConfig(BaseModel):

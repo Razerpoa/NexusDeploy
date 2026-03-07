@@ -37,6 +37,35 @@ def remove(app_name: str):
         raise typer.Exit(code=1)
 
 @app.command()
+def logs(app_name: str, tail: int = 100):
+    """
+    View logs for a deployed application
+    """
+    from core.docker_mgr import get_container_logs
+    try:
+        content = get_container_logs(app_name, tail=tail)
+        typer.echo(content)
+    except Exception as e:
+        logger.exception(f"Failed to fetch logs for {app_name}")
+        typer.echo(f"Log fetch failed. See {LOG_FILE} for details.", err=True)
+        raise typer.Exit(code=1)
+
+@app.command()
+def prune():
+    """
+    Remove unused Docker networks and volumes
+    """
+    from core.docker_mgr import prune_resources
+    try:
+        nets, vols = prune_resources()
+        typer.echo(f"Deleted networks: {len(nets.get('NetworksDeleted', []) or [])}")
+        typer.echo(f"Deleted volumes: {len(vols.get('VolumesDeleted', []) or [])}")
+    except Exception as e:
+        logger.exception("Prune failed")
+        typer.echo(f"Prune failed. See {LOG_FILE} for details.", err=True)
+        raise typer.Exit(code=1)
+
+@app.command()
 def list():
     """
     List all active Nexus-managed containers

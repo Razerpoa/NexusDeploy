@@ -1,6 +1,6 @@
 server {
     listen {{ manifest.routing.address }}:{{ manifest.routing.port }};
-    server_name _;
+    server_name {{ manifest.routing.domain }};
 
     location {{ manifest.routing.path }} {
         {% if manifest.routing.path != "/" %}

@@ -7,7 +7,15 @@ from pydantic import ValidationError
 from typing import Dict, Any
 
 from .schema import Manifest
-from .docker_mgr import pre_flight_checks, get_container_ip_and_port, reload_nginx, get_client
+from .docker_mgr import (
+    pre_flight_checks, 
+    get_container_ip_and_port, 
+    reload_nginx, 
+    get_client,
+    find_available_port,
+    is_port_available,
+    wait_for_container_health
+)
 from .logger import logger, LOG_FILE
 
 # Define base paths
@@ -41,13 +49,13 @@ def deploy_app(app_dir: str):
     manifest = load_manifest(app_path)
     print(f"Validated manifest for project: {manifest.project_name}")
 
-    # 2. Check Port Availability
-    # We could do a quick check via sockets, but since Nginx Gateway is reverse proxying
-    # the container's *internal* port or we expose it.
-    # Wait, Gateway is mapping `<address>:<port>` on the HOST. So we should check if the Host port is free?
-    # Actually, Gateway is bound to host network, so Nginx will fail to listen if port is used by another process.
-    # But Nginx can listen on it via multiple server blocks if server_names differ, but here we just use `server_name _;`
-    # Let's trust Nginx reload error handling.
+    # 2. Port Allocation
+    if manifest.routing.port is None:
+        print("No port specified. Finding available port...")
+        manifest.routing.port = find_available_port(manifest.routing.address)
+        print(f"Assigned dynamic port: {manifest.routing.port}")
+    elif not is_port_available(manifest.routing.address, manifest.routing.port):
+        raise RuntimeError(f"Port {manifest.routing.port} is already in use on {manifest.routing.address}")
 
     # 3. Infrastructure
     pre_flight_checks(manifest.infrastructure.networks, manifest.infrastructure.volumes)
@@ -68,6 +76,9 @@ def deploy_app(app_dir: str):
         cwd=app_path,
         check=True
     )
+    
+    # Wait for container to be ready
+    wait_for_container_health(manifest.project_name)
 
     # 6. Generate Nginx Route
     ip, port = get_container_ip_and_port(manifest.project_name)

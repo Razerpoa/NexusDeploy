@@ -34,6 +34,70 @@ def ensure_volume_exists(volume_cfg: VolumeConfig):
             print(f"Failed to create volume '{volume_cfg.name}': {e}")
             raise
 
+import socket
+import time
+from .logger import logger
+
+def is_port_available(address: str, port: int) -> bool:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        try:
+            s.bind((address, port))
+            return True
+        except socket.error:
+            return False
+
+def find_available_port(address: str, start_port: int = 9000) -> int:
+    port = start_port
+    while not is_port_available(address, port):
+        port += 1
+        if port > 65535:
+            raise RuntimeError("No available ports found")
+    return port
+
+def wait_for_container_health(project_name: str, timeout: int = 30):
+    client = get_client()
+    start_time = time.time()
+    print(f"Waiting for {project_name} to be healthy...")
+    
+    while time.time() - start_time < timeout:
+        try:
+            container = client.containers.get(project_name)
+            health = container.attrs.get('State', {}).get('Health', {}).get('Status')
+            status = container.attrs.get('State', {}).get('Status')
+            
+            # If a healthcheck is defined, wait for 'healthy'
+            if health:
+                if health == 'healthy':
+                    print(f"Container {project_name} is healthy.")
+                    return True
+                elif health == 'unhealthy':
+                    raise RuntimeError(f"Container {project_name} is unhealthy.")
+            # If no healthcheck, just wait for 'running'
+            elif status == 'running':
+                print(f"Container {project_name} is running.")
+                return True
+                
+        except NotFound:
+            pass
+        time.sleep(1)
+    
+    raise TimeoutError(f"Timed out waiting for {project_name} to start.")
+
+def get_container_logs(project_name: str, tail: int = 100):
+    client = get_client()
+    try:
+        container = client.containers.get(project_name)
+        return container.logs(tail=tail).decode('utf-8')
+    except NotFound:
+        return f"Container {project_name} not found."
+
+def prune_resources():
+    client = get_client()
+    print("Pruning unused Docker resources...")
+    networks = client.networks.prune()
+    volumes = client.volumes.prune()
+    return networks, volumes
+
 def pre_flight_checks(networks: List[NetworkConfig], volumes: List[VolumeConfig]):
     client = get_client()
     client.ping()  # Ensure docker daemon is accessible

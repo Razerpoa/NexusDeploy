@@ -26,6 +26,10 @@ if [ -f /etc/os-release ]; then
         else
             echo "✅ Docker is already installed."
         fi
+        
+        echo "👤 Adding $USER to the docker group..."
+        sudo usermod -aG docker $USER
+        echo "⚠️ Note: You may need to log out and back in for group changes to take effect."
     elif [ "$ID" = "arch" ]; then
         echo "📦 Installing prerequisites for Arch Linux..."
         sudo pacman -Sy --noconfirm docker docker-compose python-pip git
@@ -53,7 +57,7 @@ source .venv/bin/activate
 
 echo "📦 Installing Python dependencies from pyproject.toml..."
 pip install --upgrade pip
-pip install .
+pip install -e .
 
 # 3. Start Gateway Nginx
 echo "🌐 Starting global Gateway Nginx..."

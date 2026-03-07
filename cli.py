@@ -12,6 +12,13 @@ from core.logger import logger, LOG_FILE
 
 app = typer.Typer(help="NexusDeploy - Zero-touch Docker orchestration system")
 
+@app.callback(invoke_without_command=True)
+def main(ctx: typer.Context):
+    """Show help when no subcommand is provided."""
+    if ctx.invoked_subcommand is None:
+        typer.echo(ctx.get_help())
+        raise typer.Exit()
+
 @app.command()
 def deploy(
     folder: str,

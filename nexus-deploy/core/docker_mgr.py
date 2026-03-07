@@ -1,6 +1,6 @@
 import docker
 from docker.errors import NotFound, APIError
-from typing import List
+from typing import List, Tuple
 from .schema import NetworkConfig, VolumeConfig
 
 def get_client():

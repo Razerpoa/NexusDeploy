@@ -70,16 +70,24 @@ def list():
     """
     List all active Nexus-managed containers
     """
+    from core.state_mgr import load_state
     try:
-        containers = get_managed_containers()
-        if not containers:
-            typer.echo("No active Nexus deployments found.")
+        state = load_state()
+        
+        if not state:
+            typer.echo("No NexusDeploy applications are currently running.")
             return
 
-        typer.echo(f"{'App Name':<20} | {'Status':<15} | {'Container ID':<15}")
-        typer.echo("-" * 55)
-        for c in containers:
-            typer.echo(f"{c['name']:<20} | {c['status']:<15} | {c['id']:<15}")
+        typer.echo(f"{'PROJECT NAME':<20} | {'DOMAIN':<15} | {'PORT':<10} | {'PATH':<15} | {'SOURCE'}")
+        typer.echo("-" * 85)
+        
+        for app_name, app_data in state.items():
+            domain = app_data.get('domain', '_')
+            port = str(app_data.get('port', 'N/A'))
+            path = app_data.get('path', '/')
+            source = app_data.get('source_dir', 'Unknown')
+            
+            typer.echo(f"{app_name:<20} | {domain:<15} | {port:<10} | {path:<15} | {source}")
     except Exception as e:
         logger.exception("Failed to list containers")
         typer.echo(f"List failed. See {LOG_FILE} for details.", err=True)

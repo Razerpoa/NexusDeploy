@@ -78,14 +78,18 @@ def deploy_app(app_dir: str):
     )
     
     # Wait for container to be ready
-    wait_for_container_health(manifest.project_name)
+    try:
+        wait_for_container_health(manifest.project_name)
+    except Exception as e:
+        # If container fails to start, we should probably stop the compose to not leave it half-baked
+        print(f"Container failed health check: {e}. Tearing down...")
+        subprocess.run(["docker", "compose", "-p", manifest.project_name, "down"], cwd=app_path)
+        raise
 
     # 6. Generate Nginx Route
     ip, port = get_container_ip_and_port(manifest.project_name)
     if not ip:
         print(f"Warning: Could not determine internal IP for container {manifest.project_name}.")
-        # Use service name as a fallback? With default bridge, they aren't resolvable by name to host net gateway.
-        # But we assume get_container_ip works.
         ip = "127.0.0.1"
         port = 80
 
@@ -104,19 +108,52 @@ def deploy_app(app_dir: str):
     )
 
     conf_file = GATEWAY_CONF_D / f"{manifest.project_name}.conf"
+    
+    # Keep track if we overwrite an existing config so we can roll back
+    old_conf_data = None
+    if conf_file.exists():
+        with open(conf_file, "r") as f:
+            old_conf_data = f.read()
+
     with open(conf_file, "w") as f:
         f.write(vhost_out)
     print(f"Generated Nginx vhost config at {conf_file}")
 
-    # 7. Reload Nginx
-    success = reload_nginx()
+    # 7. Reload Nginx Safety Net
+    success, message = reload_nginx()
     if success:
+        # Save State
+        from .state_mgr import add_app_state
+        add_app_state(manifest.project_name, {
+            "source_dir": str(app_path),
+            "port": manifest.routing.port,
+            "domain": manifest.routing.domain,
+            "path": manifest.routing.path
+        })
         print(f"🎉 Successfully deployed {manifest.project_name} at http://{manifest.routing.address}:{manifest.routing.port}{manifest.routing.path}")
     else:
-        print(f"⚠️ Deployment finished, but failed to reload Nginx Gateway. Please check `nexus-gateway` logs.")
+        print(f"🚨 Nginx configuration check failed. Rolling back configuration...")
+        
+        if old_conf_data is not None:
+            # Restore previous config
+            with open(conf_file, "w") as f:
+                f.write(old_conf_data)
+        else:
+            # Delete new bad config
+            os.remove(conf_file)
+            
+        # Try to reload Gateway back to stable state
+        reload_nginx()
+        
+        print(f"Sub-optimal state: Docker container is running, but Nginx routing failed.\nReason: {message}")
+        print("Please check your custom.conf syntax and try deploying again.")
+        raise RuntimeError("Nginx Safety Net aborted deployment.")
 
 def remove_app(app_name: str):
     print(f"Removing application '{app_name}'...")
+    
+    from .state_mgr import get_app_state, remove_app_state
+    state = get_app_state(app_name)
     
     # 1. Stop and remove docker container
     client = get_client()
@@ -128,11 +165,18 @@ def remove_app(app_name: str):
     except Exception as e:
         print(f"Container '{app_name}' not found or could not be removed: {e}")
 
-    # Try to remove the compose project natively if possible, but SDK removal is usually enough
-    # To fully clean up compose networks, we might leave dangling "default" networks, 
-    # but that's typical without the original dir.
-    
-    # 2. Delete Nginx VHost
+    # 2. Cleanup Docker Compose (if we know the source directory)
+    if state and "source_dir" in state:
+        app_path = Path(state["source_dir"])
+        if (app_path / "docker-compose.yaml").exists():
+            print(f"Cleaning up compose project in {app_path}")
+            subprocess.run(
+                ["docker", "compose", "-p", app_name, "down", "-v"],
+                cwd=app_path,
+                capture_output=True
+            )
+
+    # 3. Delete Nginx VHost
     conf_file = GATEWAY_CONF_D / f"{app_name}.conf"
     if conf_file.exists():
         os.remove(conf_file)
@@ -140,7 +184,8 @@ def remove_app(app_name: str):
     else:
         print(f"Nginx config for '{app_name}' not found.")
 
-    # 3. Reload Nginx
-    success = reload_nginx()
+    # 4. Reload Nginx
+    success, _ = reload_nginx()
     if success:
+        remove_app_state(app_name)
         print(f"🗑️ Successfully removed {app_name}.")

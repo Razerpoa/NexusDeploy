@@ -1,9 +1,12 @@
+README.md
 cli.py
 pyproject.toml
 core/__init__.py
 core/docker_mgr.py
 core/engine.py
+core/logger.py
 core/schema.py
+core/state_mgr.py
 nexus_deploy.egg-info/PKG-INFO
 nexus_deploy.egg-info/SOURCES.txt
 nexus_deploy.egg-info/dependency_links.txt

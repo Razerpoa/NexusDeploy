@@ -90,11 +90,26 @@ def deploy_app(app_dir: str, dry_run: bool = False):
     # 5. Start Container via Docker Compose
     print(f"{'[DRY RUN] Would start' if dry_run else 'Starting'} docker-compose for {manifest.project_name}...")
     if not dry_run:
-        subprocess.run(
-            ["docker", "compose", "-p", manifest.project_name, "up", "-d"],
-            cwd=app_path,
-            check=True
-        )
+        try:
+            subprocess.run(
+                ["docker", "compose", "-p", manifest.project_name, "up", "-d"],
+                cwd=app_path,
+                check=True,
+                capture_output=True,
+                text=True
+            )
+        except subprocess.CalledProcessError as e:
+            error_msg = e.stderr or e.stdout or str(e)
+            print(f"🚨 Failed to start containers via Docker Compose:\n{error_msg}")
+            
+            # Specific hint for pull access denied
+            if "pull access denied" in error_msg:
+                print("\n💡 HINT: Pull access denied. This usually means:")
+                print("   1. The image name is misspelled.")
+                print("   2. The image is private and you need to run 'docker login'.")
+                print("   3. The image does not exist on the registry.\n")
+            
+            raise RuntimeError(f"Docker Compose failed: {error_msg}")
         
         # Wait for container to be ready
         try:

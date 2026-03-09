@@ -191,3 +191,14 @@ def get_managed_containers():
                 "id": c.short_id
             })
     return managed
+    
+def exec_container(project_name: str, command: List[str]) -> Tuple[int, str]:
+    client = get_client()
+    try:
+        container = client.containers.get(project_name)
+        exit_code, output = container.exec_run(command)
+        return exit_code, output.decode('utf-8')
+    except NotFound:
+        raise RuntimeError(f"Container '{project_name}' not found.")
+    except Exception as e:
+        raise RuntimeError(f"Failed to execute command in container '{project_name}': {e}")

@@ -1,6 +1,7 @@
 import typer
 from pathlib import Path
 import sys
+from typing import List
 
 # Depending on how the package is run (via module or directly).
 # For dev purposes in this directory structure:
@@ -120,6 +121,25 @@ def list():
     except Exception as e:
         logger.exception("Failed to list containers")
         typer.echo(f"List failed. See {LOG_FILE} for details.", err=True)
+        raise typer.Exit(code=1)
+
+@app.command()
+def exec(
+    app_name: str,
+    command: List[str] = typer.Argument(..., help="The command to run inside the container")
+):
+    """
+    Run a command inside a Nexus-managed container
+    """
+    from core.docker_mgr import exec_container
+    try:
+        exit_code, output = exec_container(app_name, command)
+        typer.echo(output)
+        if exit_code != 0:
+            raise typer.Exit(code=exit_code)
+    except Exception as e:
+        logger.exception(f"Exec failed for {app_name}")
+        typer.echo(f"Exec failed: {e}", err=True)
         raise typer.Exit(code=1)
 
 if __name__ == "__main__":

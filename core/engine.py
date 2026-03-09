@@ -50,6 +50,9 @@ def deploy_app(app_dir: str, dry_run: bool = False):
     print(f"Validated manifest for project: {manifest.project_name}")
 
     # 2. Port Allocation
+    from .state_mgr import get_app_state
+    existing_state = get_app_state(manifest.project_name)
+
     if manifest.routing.port is None:
         print("No port specified. Finding available port...")
         if not dry_run:
@@ -57,8 +60,14 @@ def deploy_app(app_dir: str, dry_run: bool = False):
         else:
             manifest.routing.port = 9000  # Mock port for dry run
         print(f"Assigned dynamic port: {manifest.routing.port}")
-    elif not dry_run and not is_port_available(manifest.routing.address, manifest.routing.port):
-        raise RuntimeError(f"Port {manifest.routing.port} is already in use on {manifest.routing.address}")
+    elif not dry_run:
+        port_available = is_port_available(manifest.routing.address, manifest.routing.port)
+        # It's only a conflict if the port is taken and NOT by this same project
+        is_own_port = existing_state and existing_state.get('port') == manifest.routing.port
+        
+        if not port_available and not is_own_port:
+            raise RuntimeError(f"Port {manifest.routing.port} is already in use by another process on {manifest.routing.address}")
+
 
     # 3. Infrastructure
     if not dry_run:
@@ -164,9 +173,19 @@ def deploy_app(app_dir: str, dry_run: bool = False):
         # Try to reload Gateway back to stable state
         reload_nginx()
         
+        # FIX (Bug 4): If this was a NEW deployment (no old_conf), we should also stop the container 
+        # to avoid "zombie" containers blocking future binds.
+        if old_conf_data is None and not dry_run:
+            print(f"Cleanup: Removing failed deployment container '{manifest.project_name}'...")
+            try:
+                subprocess.run(["docker", "compose", "-p", manifest.project_name, "down", "-v"], cwd=app_path, capture_output=True)
+            except Exception as e:
+                print(f"Warning: Failed to cleanup container: {e}")
+
         print(f"Sub-optimal state: Docker container is running, but Nginx routing failed.\nReason: {message}")
         print("Please check your custom.conf syntax and try deploying again.")
         raise RuntimeError("Nginx Safety Net aborted deployment.")
+
 
 def remove_app(app_name: str):
     print(f"Removing application '{app_name}'...")

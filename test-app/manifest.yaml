@@ -1,12 +1,11 @@
-project_name: "root-test-app"   # Unique identifier for the Docker container and Nginx config
+project_name: "test-app"   # Unique identifier for the Docker container and Nginx config
 image: "nginx:alpine"           # The Docker image to pull and deploy
 
 routing:
   address: "0.0.0.0"            # The IP address the Nginx gateway will bind to
-  port: 8081                    # The host port to expose.
+  port: 8082                    # The host port to expose.
   path: "/test"                 # The URL subpath. Nginx will strip this and proxy to the root '/' of the container.
   domain: "localhost"           # The exact domain name this app responds to. Requesting 127.0.0.1 directly will bypass this.
-  ssl: false                    # Flag for future HTTPS/Certbot integration
 
 infrastructure:
   networks:                     # List of Docker networks to attach. NexusDeploy auto-creates them if missing.

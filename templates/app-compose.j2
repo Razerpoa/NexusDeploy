@@ -3,7 +3,10 @@ services:
     image: {{ manifest.image }}
     container_name: {{ manifest.project_name }}
     restart: unless-stopped
-    
+
+    # No host port mapping to avoid conflict with host-mode Gateway (host network_mode).
+    # Application is accessed via Docker network by the Gateway.
+
     {% if manifest.env_vars %}
     environment:
       {% for key, value in manifest.env_vars.items() %}
@@ -28,11 +31,22 @@ services:
 
 {% if manifest.infrastructure.networks or manifest.infrastructure.volumes %}
 {% if manifest.infrastructure.volumes %}
+{% set ns = namespace(has_named=false) %}
+{% for vol in manifest.infrastructure.volumes %}
+  {% if not (vol.name.startswith('/') or vol.name.startswith('./') or vol.name.startswith('~/')) %}
+    {% set ns.has_named = true %}
+  {% endif %}
+{% endfor %}
+
+{% if ns.has_named %}
 volumes:
   {% for vol in manifest.infrastructure.volumes %}
+  {% if not (vol.name.startswith('/') or vol.name.startswith('./') or vol.name.startswith('~/')) %}
   {{ vol.name }}:
     external: true
+  {% endif %}
   {% endfor %}
+{% endif %}
 {% endif %}
 
 {% if manifest.infrastructure.networks %}

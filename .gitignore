@@ -33,6 +33,7 @@ docker-compose.override.yml
 # Application Specific
 apps/*
 *.log
+nexus-state.json
 
 # OS
 .DS_Store

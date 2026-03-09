@@ -1,0 +1,58 @@
+services:
+  test-app:
+    image: nginx:alpine
+    container_name: test-app
+    restart: unless-stopped
+
+    # No host port mapping to avoid conflict with host-mode Gateway (host network_mode).
+    # Application is accessed via Docker network by the Gateway.
+
+    
+    environment:
+      
+      - DEBUG=true
+      
+    
+
+    
+    volumes:
+      
+      - test-data:/usr/share/nginx/html
+      
+    
+
+    networks:
+      - default
+      
+      
+      - nexus-apps
+      
+      
+
+
+
+
+
+  
+    
+  
+
+
+
+volumes:
+  
+  
+  test-data:
+    external: true
+  
+  
+
+
+
+
+networks:
+  
+  nexus-apps:
+    external: true
+  
+

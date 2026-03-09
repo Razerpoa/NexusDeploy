@@ -21,6 +21,11 @@ def ensure_network_exists(network_cfg: NetworkConfig):
             raise
 
 def ensure_volume_exists(volume_cfg: VolumeConfig):
+    # If the volume name is a host path (starts with ./ , / , or ~), skip Docker volume creation
+    if volume_cfg.name.startswith(("./", "/", "~/")):
+        print(f"Volume '{volume_cfg.name}' appears to be a bind mount. Skipping Docker volume creation.")
+        return
+
     client = get_client()
     try:
         client.volumes.get(volume_cfg.name)

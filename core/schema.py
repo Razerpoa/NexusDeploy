@@ -6,7 +6,6 @@ class RoutingConfig(BaseModel):
     port: Optional[int] = None
     path: str = "/"
     domain: str = "_"
-    ssl: bool = False
 
 class NetworkConfig(BaseModel):
     name: str

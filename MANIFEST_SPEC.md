@@ -43,8 +43,6 @@ routing:
                                 
   domain: "myapp.local"         # (Optional) The domain name for Nginx Virtual Hosting (`server_name`). 
                                 # Defaults to `_` (catch-all for the IP).
-                                
-  ssl: false                    # (Optional) Reserved for future HTTPS implementations. Defaults to false.
 
 # ---------------------------------------------------------
 # INFRASTRUCTURE MANAGEMENT

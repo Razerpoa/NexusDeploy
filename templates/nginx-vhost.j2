@@ -4,12 +4,11 @@ server {
 
     location {{ manifest.routing.path }} {
         {% if manifest.routing.path != "/" %}
-        rewrite ^{{ manifest.routing.path }}/(.*) /$1 break;
-        rewrite ^{{ manifest.routing.path }}$ / break;
-        {% endif %}
-        
-        # Proxy to the container IP
+        # Strip the prefix by adding a trailing slash to proxy_pass
+        proxy_pass http://{{ container_ip }}{% if container_port %}:{{ container_port }}{% endif %}/;
+        {% else %}
         proxy_pass http://{{ container_ip }}{% if container_port %}:{{ container_port }}{% endif %};
+        {% endif %}
         
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;

@@ -2,6 +2,7 @@ import docker
 from docker.errors import NotFound, APIError
 from typing import List, Tuple
 from .schema import NetworkConfig, VolumeConfig
+from .exceptions import InfrastructureError, AppNotFoundError
 
 def get_client():
     return docker.from_env()
@@ -17,27 +18,29 @@ def ensure_network_exists(network_cfg: NetworkConfig):
             client.networks.create(name=network_cfg.name, driver=network_cfg.driver)
             print(f"Network '{network_cfg.name}' created.")
         except APIError as e:
-            print(f"Failed to create network '{network_cfg.name}': {e}")
-            raise
+            msg = f"Failed to create network '{network_cfg.name}': {e}"
+            print(msg)
+            raise InfrastructureError(msg)
 
 def ensure_volume_exists(volume_cfg: VolumeConfig):
     # If the volume name is a host path (starts with ./ , / , or ~), skip Docker volume creation
-    if volume_cfg.name.startswith(("./", "/", "~/")):
-        print(f"Volume '{volume_cfg.name}' appears to be a bind mount. Skipping Docker volume creation.")
+    if volume_cfg.host_path.startswith(("./", "/", "~/")):
+        print(f"Volume '{volume_cfg.host_path}' appears to be a bind mount. Skipping Docker volume creation.")
         return
 
     client = get_client()
     try:
-        client.volumes.get(volume_cfg.name)
-        print(f"Volume '{volume_cfg.name}' already exists.")
+        client.volumes.get(volume_cfg.host_path)
+        print(f"Volume '{volume_cfg.host_path}' already exists.")
     except NotFound:
-        print(f"Creating volume '{volume_cfg.name}'...")
+        print(f"Creating volume '{volume_cfg.host_path}'...")
         try:
-            client.volumes.create(name=volume_cfg.name)
-            print(f"Volume '{volume_cfg.name}' created.")
+            client.volumes.create(name=volume_cfg.host_path)
+            print(f"Volume '{volume_cfg.host_path}' created.")
         except APIError as e:
-            print(f"Failed to create volume '{volume_cfg.name}': {e}")
-            raise
+            msg = f"Failed to create volume '{volume_cfg.host_path}': {e}"
+            print(msg)
+            raise InfrastructureError(msg)
 
 import socket
 import time
@@ -199,6 +202,6 @@ def exec_container(project_name: str, command: List[str]) -> Tuple[int, str]:
         exit_code, output = container.exec_run(command)
         return exit_code, output.decode('utf-8')
     except NotFound:
-        raise RuntimeError(f"Container '{project_name}' not found.")
+        raise AppNotFoundError(f"Container '{project_name}' not found.")
     except Exception as e:
-        raise RuntimeError(f"Failed to execute command in container '{project_name}': {e}")
+        raise InfrastructureError(f"Failed to execute command in container '{project_name}': {e}")

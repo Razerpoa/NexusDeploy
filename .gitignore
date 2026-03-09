@@ -34,6 +34,7 @@ docker-compose.override.yml
 apps/*
 *.log
 nexus-state.json
+gateway/conf.d/*
 
 # OS
 .DS_Store

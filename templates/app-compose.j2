@@ -17,7 +17,7 @@ services:
     {% if manifest.infrastructure.volumes %}
     volumes:
       {% for vol in manifest.infrastructure.volumes %}
-      - {{ vol.name }}:{{ vol.mount_path }}
+      - {{ vol.host_path }}:{{ vol.container_path }}
       {% endfor %}
     {% endif %}
 
@@ -33,7 +33,7 @@ services:
 {% if manifest.infrastructure.volumes %}
 {% set ns = namespace(has_named=false) %}
 {% for vol in manifest.infrastructure.volumes %}
-  {% if not (vol.name.startswith('/') or vol.name.startswith('./') or vol.name.startswith('~/')) %}
+  {% if not (vol.host_path.startswith('/') or vol.host_path.startswith('./') or vol.host_path.startswith('~/')) %}
     {% set ns.has_named = true %}
   {% endif %}
 {% endfor %}
@@ -41,8 +41,8 @@ services:
 {% if ns.has_named %}
 volumes:
   {% for vol in manifest.infrastructure.volumes %}
-  {% if not (vol.name.startswith('/') or vol.name.startswith('./') or vol.name.startswith('~/')) %}
-  {{ vol.name }}:
+  {% if not (vol.host_path.startswith('/') or vol.host_path.startswith('./') or vol.host_path.startswith('~/')) %}
+  {{ vol.host_path }}:
     external: true
   {% endif %}
   {% endfor %}

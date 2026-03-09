@@ -12,8 +12,8 @@ infrastructure:
     - name: "nexus-apps"
       driver: "bridge"
   volumes:                      # List of Docker volumes to mount. NexusDeploy auto-creates them if missing.
-    - name: "test-data"
-      mount_path: "/usr/share/nginx/html"
+    - host_path: "test-data"
+      container_path: "/usr/share/nginx/html"
 
 env_vars:                       # Key-value pairs of environment variables passed to the container
   DEBUG: "true"

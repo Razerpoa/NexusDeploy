@@ -17,6 +17,7 @@ from .docker_mgr import (
     wait_for_container_health
 )
 from .logger import logger, LOG_FILE
+from .exceptions import ManifestError, InfrastructureError, PortConflictError
 
 # Define base paths
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -28,7 +29,7 @@ env = Environment(loader=FileSystemLoader(str(TEMPLATES_DIR)))
 def load_manifest(app_dir: Path) -> Manifest:
     manifest_path = app_dir / "manifest.yaml"
     if not manifest_path.exists():
-        raise FileNotFoundError(f"Manifest not found at {manifest_path}")
+        raise ManifestError(f"Manifest not found at {manifest_path}")
 
     with open(manifest_path, "r") as f:
         data = yaml.safe_load(f)
@@ -37,9 +38,7 @@ def load_manifest(app_dir: Path) -> Manifest:
         manifest = Manifest(**data)
         return manifest
     except ValidationError as e:
-        print("Manifest validation failed:")
-        print(e)
-        raise
+        raise ManifestError("Manifest validation failed", hint=str(e))
 
 def deploy_app(app_dir: str, dry_run: bool = False):
     app_path = Path(app_dir).resolve()
@@ -66,7 +65,10 @@ def deploy_app(app_dir: str, dry_run: bool = False):
         is_own_port = existing_state and existing_state.get('port') == manifest.routing.port
         
         if not port_available and not is_own_port:
-            raise RuntimeError(f"Port {manifest.routing.port} is already in use by another process on {manifest.routing.address}")
+            raise PortConflictError(
+                f"Port {manifest.routing.port} is already in use by another process on {manifest.routing.address}",
+                hint="Try specifying a different port in manifest.yaml or let NexusDeploy assign one automatically."
+            )
 
 
     # 3. Infrastructure
@@ -103,22 +105,23 @@ def deploy_app(app_dir: str, dry_run: bool = False):
             print(f"🚨 Failed to start containers via Docker Compose:\n{error_msg}")
             
             # Specific hint for pull access denied
+            hint = None
             if "pull access denied" in error_msg:
-                print("\n💡 HINT: Pull access denied. This usually means:")
-                print("   1. The image name is misspelled.")
-                print("   2. The image is private and you need to run 'docker login'.")
-                print("   3. The image does not exist on the registry.\n")
+                hint = (
+                    "Pull access denied. This usually means:\n"
+                    "1. The image name is misspelled.\n"
+                    "2. The image is private and you need to run 'docker login'.\n"
+                    "3. The image does not exist on the registry."
+                )
             
-            raise RuntimeError(f"Docker Compose failed: {error_msg}")
+            raise InfrastructureError(f"Docker Compose failed: {error_msg}", hint=hint)
         
         # Wait for container to be ready
         try:
             wait_for_container_health(manifest.project_name)
         except Exception as e:
             # If container fails to start, we should probably stop the compose to not leave it half-baked
-            print(f"Container failed health check: {e}. Tearing down...")
-            subprocess.run(["docker", "compose", "-p", manifest.project_name, "down"], cwd=app_path)
-            raise
+            raise InfrastructureError(f"Container failed health check: {e}")
 
     # 6. Generate Nginx Route
     if not dry_run:
@@ -198,8 +201,7 @@ def deploy_app(app_dir: str, dry_run: bool = False):
                 print(f"Warning: Failed to cleanup container: {e}")
 
         print(f"Sub-optimal state: Docker container is running, but Nginx routing failed.\nReason: {message}")
-        print("Please check your custom.conf syntax and try deploying again.")
-        raise RuntimeError("Nginx Safety Net aborted deployment.")
+        raise InfrastructureError("Nginx Safety Net aborted deployment.", hint=message)
 
 
 def remove_app(app_name: str):

@@ -12,8 +12,8 @@ class NetworkConfig(BaseModel):
     driver: str = "bridge"
 
 class VolumeConfig(BaseModel):
-    name: str
-    mount_path: str
+    host_path: str
+    container_path: str
 
 class InfrastructureConfig(BaseModel):
     networks: Optional[List[NetworkConfig]] = Field(default_factory=list)

@@ -10,8 +10,18 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from core.engine import deploy_app, remove_app
 from core.docker_mgr import get_managed_containers
 from core.logger import logger, LOG_FILE
+from core.exceptions import NexusError
 
 app = typer.Typer(help="NexusDeploy - Zero-touch Docker orchestration system")
+
+def handle_nexus_error(e: NexusError):
+    """Format and display NexusError without a traceback."""
+    typer.secho(f"\n🚨 {e.message}", fg=typer.colors.RED, bold=True)
+    if e.hint:
+        typer.secho(f"💡 HINT: {e.hint}\n", fg=typer.colors.CYAN)
+    else:
+        typer.echo("")
+    raise typer.Exit(code=1)
 
 @app.callback(invoke_without_command=True)
 def main(ctx: typer.Context):
@@ -30,6 +40,8 @@ def deploy(
     """
     try:
         deploy_app(folder, dry_run=dry_run)
+    except NexusError as e:
+        handle_nexus_error(e)
     except Exception as e:
         logger.exception("Deployment failed")
         typer.echo(f"Deployment failed. See {LOG_FILE} for details.", err=True)
@@ -42,6 +54,8 @@ def remove(app_name: str):
     """
     try:
         remove_app(app_name)
+    except NexusError as e:
+        handle_nexus_error(e)
     except Exception as e:
         logger.exception(f"Removal failed for {app_name}")
         typer.echo(f"Removal failed. See {LOG_FILE} for details.", err=True)
@@ -56,6 +70,8 @@ def logs(app_name: str, tail: int = 100):
     try:
         content = get_container_logs(app_name, tail=tail)
         typer.echo(content)
+    except NexusError as e:
+        handle_nexus_error(e)
     except Exception as e:
         logger.exception(f"Failed to fetch logs for {app_name}")
         typer.echo(f"Log fetch failed. See {LOG_FILE} for details.", err=True)
@@ -71,6 +87,8 @@ def prune():
         nets, vols = prune_resources()
         typer.echo(f"Deleted networks: {len(nets.get('NetworksDeleted', []) or [])}")
         typer.echo(f"Deleted volumes: {len(vols.get('VolumesDeleted', []) or [])}")
+    except NexusError as e:
+        handle_nexus_error(e)
     except Exception as e:
         logger.exception("Prune failed")
         typer.echo(f"Prune failed. See {LOG_FILE} for details.", err=True)
@@ -90,6 +108,8 @@ def reload():
         else:
             typer.echo(f"🚨 Nginx reload failed: {message}", err=True)
             raise typer.Exit(code=1)
+    except NexusError as e:
+        handle_nexus_error(e)
     except Exception as e:
         logger.exception("Reload command failed")
         typer.echo(f"Reload command failed. See {LOG_FILE} for details.", err=True)
@@ -118,6 +138,8 @@ def list():
             source = app_data.get('source_dir', 'Unknown')
             
             typer.echo(f"{app_name:<20} | {domain:<15} | {port:<10} | {path:<15} | {source}")
+    except NexusError as e:
+        handle_nexus_error(e)
     except Exception as e:
         logger.exception("Failed to list containers")
         typer.echo(f"List failed. See {LOG_FILE} for details.", err=True)
@@ -137,6 +159,8 @@ def exec(
         typer.echo(output)
         if exit_code != 0:
             raise typer.Exit(code=exit_code)
+    except NexusError as e:
+        handle_nexus_error(e)
     except Exception as e:
         logger.exception(f"Exec failed for {app_name}")
         typer.echo(f"Exec failed: {e}", err=True)
